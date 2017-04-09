@@ -1,0 +1,281 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <meta charset="utf-8">
+  
+  <title>iOS 客户端基于 WebP 图片格式的流量优化（上） | curiosity小鶸</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1">
+  <meta name="description" content="首先，这是一个基于具体业务的组件优化方案，我尽量把业务逻辑从代码中抽离出来，部分地方代码可能有删减。 现在这个方案是用于一个多图片的新闻类应用，粗略估计过，用户在浏览完第一页所有新闻（共48篇），会消耗流量达100M，其中98M为图片，这里值得优化的空间非常大。 针对这种情况，我们先后使用过的优化包含：wifi条件下预载所有文章、图片和js、css数据；重用所有已经下载的js、css和图片的缓存；">
+<meta name="keywords" content="应用技术">
+<meta property="og:type" content="article">
+<meta property="og:title" content="iOS 客户端基于 WebP 图片格式的流量优化（上）">
+<meta property="og:url" content="https://curiosityst.github.io/2017/04/08/iOS 客户端基于 WebP 图片格式的流量优化（上）/index.html">
+<meta property="og:site_name" content="curiosity小鶸">
+<meta property="og:description" content="首先，这是一个基于具体业务的组件优化方案，我尽量把业务逻辑从代码中抽离出来，部分地方代码可能有删减。 现在这个方案是用于一个多图片的新闻类应用，粗略估计过，用户在浏览完第一页所有新闻（共48篇），会消耗流量达100M，其中98M为图片，这里值得优化的空间非常大。 针对这种情况，我们先后使用过的优化包含：wifi条件下预载所有文章、图片和js、css数据；重用所有已经下载的js、css和图片的缓存；">
+<meta property="og:updated_time" content="2017-04-08T16:30:15.000Z">
+<meta name="twitter:card" content="summary">
+<meta name="twitter:title" content="iOS 客户端基于 WebP 图片格式的流量优化（上）">
+<meta name="twitter:description" content="首先，这是一个基于具体业务的组件优化方案，我尽量把业务逻辑从代码中抽离出来，部分地方代码可能有删减。 现在这个方案是用于一个多图片的新闻类应用，粗略估计过，用户在浏览完第一页所有新闻（共48篇），会消耗流量达100M，其中98M为图片，这里值得优化的空间非常大。 针对这种情况，我们先后使用过的优化包含：wifi条件下预载所有文章、图片和js、css数据；重用所有已经下载的js、css和图片的缓存；">
+  
+    <link rel="alternate" href="/atom.xml" title="curiosity小鶸" type="application/atom+xml">
+  
+  
+    <link rel="icon" href="/favicon.png">
+  
+  
+    <link href="//fonts.googleapis.com/css?family=Source+Code+Pro" rel="stylesheet" type="text/css">
+  
+  <link rel="stylesheet" href="/css/style.css">
+  
+
+</head>
+
+<body>
+  <div id="container">
+    <div id="wrap">
+      <header id="header">
+  <div id="banner"></div>
+  <div id="header-outer" class="outer">
+    <div id="header-title" class="inner">
+      <h1 id="logo-wrap">
+        <a href="/" id="logo">curiosity小鶸</a>
+      </h1>
+      
+        <h2 id="subtitle-wrap">
+          <a href="/" id="subtitle">人生何所求 致富和自由</a>
+        </h2>
+      
+    </div>
+    <div id="header-inner" class="inner">
+      <nav id="main-nav">
+        <a id="main-nav-toggle" class="nav-icon"></a>
+        
+          <a class="main-nav-link" href="/">Home</a>
+        
+          <a class="main-nav-link" href="/archives">Archives</a>
+        
+      </nav>
+      <nav id="sub-nav">
+        
+          <a id="nav-rss-link" class="nav-icon" href="/atom.xml" title="RSS Feed"></a>
+        
+        <a id="nav-search-btn" class="nav-icon" title="Search"></a>
+      </nav>
+      <div id="search-form-wrap">
+        <form action="//google.com/search" method="get" accept-charset="UTF-8" class="search-form"><input type="search" name="q" class="search-form-input" placeholder="Search"><button type="submit" class="search-form-submit">&#xF002;</button><input type="hidden" name="sitesearch" value="https://curiosityst.github.io"></form>
+      </div>
+    </div>
+  </div>
+</header>
+      <div class="outer">
+        <section id="main"><article id="post-iOS 客户端基于 WebP 图片格式的流量优化（上）" class="article article-type-post" itemscope itemprop="blogPost">
+  <div class="article-meta">
+    <a href="/2017/04/08/iOS 客户端基于 WebP 图片格式的流量优化（上）/" class="article-date">
+  <time datetime="2017-04-08T15:27:34.000Z" itemprop="datePublished">2017-04-08</time>
+</a>
+    
+  <div class="article-category">
+    <a class="article-category-link" href="/categories/工程实践/">工程实践</a>
+  </div>
+
+  </div>
+  <div class="article-inner">
+    
+    
+      <header class="article-header">
+        
+  
+    <h1 class="article-title" itemprop="name">
+      iOS 客户端基于 WebP 图片格式的流量优化（上）
+    </h1>
+  
+
+      </header>
+    
+    <div class="article-entry" itemprop="articleBody">
+      
+        <p>首先，这是一个基于具体业务的组件优化方案，我尽量把业务逻辑从代码中抽离出来，部分地方代码可能有删减。</p>
+<p>现在这个方案是用于一个多图片的新闻类应用，粗略估计过，用户在浏览完第一页所有新闻（共48篇），会消耗流量达100M，其中98M为图片，这里值得优化的空间非常大。</p>
+<p>针对这种情况，我们先后使用过的优化包含：wifi条件下预载所有文章、图片和js、css数据；重用所有已经下载的js、css和图片的缓存；后台图片的压缩。</p>
+<p>后台压缩和WebP化依赖第三方多媒体处理服务器，已知比较好的国内服务有腾讯优图和七牛。这里我们采用的七牛的服务。</p>
+<p>我们的后台通过七牛的图片压缩（包含质量和分辨率），我们将首页流量由100m减少到了80m，依然有极大的提升空间。因此客户端采用基于WebP的流量压缩方案，将流量由80m压缩到了20m，减少了75%！相对于最初的处理，流量减少了80%！（android大多数机型支持WebP animated，压缩能达到80%，但iOS的解码对于WebP animated图片支持并不好，经常会出现失败的情况，所以iOS最终压缩率取决于首页中gif图的个数和大小，实际测试结果，优化幅度大概60%-80%之间）</p>
+<p>在准备做这项优化之前，查阅过很多资料，发现WebP适配的相关文章博客，都只是介绍简单的功能性适配，所以，并没有得到什么好的思路。</p>
+<p>于是，在三周的时间里，我一直边测试边优化，在没有初步方案的情况下，一点点完成功能，最终整理代码，解耦组件，整理出一套效果非常理想，并且使用方便的解决方案。</p>
+<p>###一、了解 WebP</p>
+<p>WebP，是一种同时提供了有损压缩与无损压缩的图片文件格式，是Google新推出的影像技术，它可让网页图档有效进行压缩，同时又不影响图片格式兼容与实际清晰度，进而让整体网页下载速度加快。</p>
+<ul>
+<li>WebP 无损压缩的图片可以比同样大小的 PNG 小 26%；</li>
+<li>WebP 有损压缩的图片可以比同样大小的 JPEG 小 25-34%；</li>
+<li>WebP 支持无损的透明图层通道，代价只需增加 22% 的字节存储空间；</li>
+<li>WebP 有损透明图像可以比同样大小的 PNG 图像小3倍。</li>
+</ul>
+<p>WebP在Native支持方面上，早已比较成熟，据说淘宝客户端在两年前就使用了WebP（主要是Native使用），后来H5全面使用，WebView的WebP采用插件的方式支持。</p>
+<p>在安卓上，WebP的支持是非常简单的，毕竟都是谷歌的东西，自己当然要支持，但是在iOS的WebKit内核（UIWebView和WKWebView）上，是不能直接支持的。不过最近传言macOS 10.12上的Safari有测试WebP的迹象，暂时还不太明朗。</p>
+<h3 id="二、准备工作"><a href="#二、准备工作" class="headerlink" title="二、准备工作"></a>二、准备工作</h3><p>由于OS X不支持原生WebP解码，所以，可以先安装一个工具。推荐使用Homebrew，具体使用参考 <a href="http://brew.sh/index_zh-cn.html" target="_blank" rel="external">http://brew.sh/index_zh-cn.html</a></p>
+<p>安装完成后，使用命令<br><figure class="highlight plain"><table><tr><td class="gutter"><pre><div class="line">1</div></pre></td><td class="code"><pre><div class="line">$brew install webp</div></pre></td></tr></table></figure></p>
+<p>就可以安装libwebp了。</p>
+<p>客户端方面，Native图片加载使用的SDWebImage，该组件直接支持WebP的解码。需要在将预编译宏’WebP’置为1，并在pod中引入’iOS-WebP’即可。</p>
+<p>服务端方面，我们采用七牛图片服务器，默认传给客户端的参数是一张jpg或者png的图片链接，通过修改url的请求参数实现对WebP图片的获取。相关规则可以参考七牛开发文档。</p>
+<h3 id="三、具体方案实现"><a href="#三、具体方案实现" class="headerlink" title="三、具体方案实现"></a>三、具体方案实现</h3><p>首先考虑，请求的webp图片是通过url参数拼接完成的，所以，需要对客户端内请求的所有图片URL做处理，必须全部命中。而且，将来的缓存也应基于此URL进行处理，所以，添加一个NSURL分类，URL的处理由这个分类统一处理，所有的URL替换最终都会指向这个分类中的方法，耦合度基本可以将至最低。</p>
+<figure class="highlight plain"><table><tr><td class="gutter"><pre><div class="line">1</div><div class="line">2</div><div class="line">3</div><div class="line">4</div><div class="line">5</div></pre></td><td class="code"><pre><div class="line">@interface NSURL (ReplaceWebP)</div><div class="line">- (NSURL *)qd_replaceToWebPURLWithScreenWidth;</div><div class="line">- (NSString *)qd_defultWebPURLCacheKey;</div><div class="line">- (BOOL)qd_isShouldReplaceImageFormat;</div><div class="line">@end</div></pre></td></tr></table></figure>
+<p>下面是替换URL和缓存key的核心处理代码</p>
+<figure class="highlight plain"><table><tr><td class="gutter"><pre><div class="line">1</div><div class="line">2</div><div class="line">3</div><div class="line">4</div><div class="line">5</div><div class="line">6</div><div class="line">7</div><div class="line">8</div><div class="line">9</div><div class="line">10</div><div class="line">11</div><div class="line">12</div><div class="line">13</div><div class="line">14</div><div class="line">15</div><div class="line">16</div><div class="line">17</div><div class="line">18</div><div class="line">19</div><div class="line">20</div><div class="line">21</div><div class="line">22</div><div class="line">23</div><div class="line">24</div><div class="line">25</div><div class="line">26</div><div class="line">27</div><div class="line">28</div><div class="line">29</div><div class="line">30</div><div class="line">31</div><div class="line">32</div><div class="line">33</div><div class="line">34</div><div class="line">35</div><div class="line">36</div><div class="line">37</div><div class="line">38</div><div class="line">39</div></pre></td><td class="code"><pre><div class="line">static NSString * const qdHost = @&quot;img.host.com&quot;;</div><div class="line">@implementation NSURL (ReplaceWebP)</div><div class="line">- (NSString *)qd_defultWebPURLCacheKey &#123;</div><div class="line">    if (![self qd_isShouldReplaceImageFormat]) &#123;</div><div class="line">        return self.absoluteString;</div><div class="line">    &#125;</div><div class="line">    NSString *key;</div><div class="line">    if ([self isWebPURL]) &#123;</div><div class="line">        key = self.absoluteString;</div><div class="line">    &#125; else &#123;</div><div class="line">        key = [self qd_replaceToWebPURLWithScreenWidth].absoluteString;</div><div class="line">    &#125;</div><div class="line">    return key;</div><div class="line">&#125;</div><div class="line">- (NSURL *)qd_replaceToWebPURLWithImageWidth:(int)width &#123;</div><div class="line">  </div><div class="line">    if ([self qd_isShouldReplaceImageFormat]) &#123;</div><div class="line">        NSString *urlStr;</div><div class="line">        </div><div class="line">        if ([self URLStringcontainFomartString:@&quot;?&quot;]) &#123;</div><div class="line">            if ([self URLStringcontainFomartString:@&quot;format/jpg&quot;]) &#123;</div><div class="line">                urlStr = [self.absoluteString stringByReplacingOccurrencesOfString:@&quot;format/jpg&quot; withString:@&quot;format/webp&quot;];</div><div class="line">            &#125; else &#123;</div><div class="line">                NSString *suffixStr = @&quot;imageView2/0/format/webp/ignore-error/1&quot;;</div><div class="line">                urlStr = [NSString stringWithFormat:@&quot;%@/%@&quot;, self.absoluteString, suffixStr];</div><div class="line">            &#125;</div><div class="line">        &#125; else &#123;</div><div class="line">            NSString *pathExtension = [[self.absoluteString.pathExtension componentsSeparatedByString:@&quot;-&quot;] firstObject];</div><div class="line">            urlStr = [NSString stringWithFormat:@&quot;%@.%@-WebPiOSW%d&quot;,self.absoluteString.stringByDeletingPathExtension, pathExtension, width];</div><div class="line">        &#125;</div><div class="line">        return [NSURL URLWithString:urlStr];</div><div class="line">    &#125;</div><div class="line">    return self;</div><div class="line">&#125;</div><div class="line">- (NSURL *)qd_replaceToWebPURLWithScreenWidth &#123;</div><div class="line">    </div><div class="line">    int width = (int)([UIScreen mainScreen].bounds.size.width * [UIScreen mainScreen].scale);</div><div class="line">    return [self qd_replaceToWebPURLWithImageWidth:(int)width];</div><div class="line">&#125;</div></pre></td></tr></table></figure>
+<p>所有的URL替换，最终都会到 - (NSURL *)qd_replaceToWebPURLWithImageWidth:(int)width 这个方法中来</p>
+<p>下面是条件过滤，确保100%命中所有需要替换的图片格式</p>
+<figure class="highlight plain"><table><tr><td class="gutter"><pre><div class="line">1</div><div class="line">2</div><div class="line">3</div><div class="line">4</div><div class="line">5</div><div class="line">6</div><div class="line">7</div><div class="line">8</div><div class="line">9</div><div class="line">10</div><div class="line">11</div><div class="line">12</div><div class="line">13</div><div class="line">14</div><div class="line">15</div><div class="line">16</div><div class="line">17</div><div class="line">18</div><div class="line">19</div><div class="line">20</div><div class="line">21</div><div class="line">22</div><div class="line">23</div><div class="line">24</div><div class="line">25</div><div class="line">26</div><div class="line">27</div><div class="line">28</div><div class="line">29</div></pre></td><td class="code"><pre><div class="line">- (BOOL)isQDHost &#123;</div><div class="line">    NSString *nsModel = [UIDevice currentDevice].model;</div><div class="line">    BOOL s_isiPad = [nsModel hasPrefix:@&quot;iPad&quot;];</div><div class="line">    if (s_isiPad) return NO;</div><div class="line">    return [self URLStringcontainFomartString:qdHost];</div><div class="line">&#125;</div><div class="line">- (BOOL)qd_isShouldReplaceImageFormat &#123;</div><div class="line">    </div><div class="line">    if (![self isQDHost]) &#123;</div><div class="line">        return NO;</div><div class="line">    &#125;</div><div class="line">    if ([self isWebPURL]) &#123;</div><div class="line">        return NO;</div><div class="line">    &#125;</div><div class="line">    NSArray *extensions = @[@&quot;.jpg&quot;, @&quot;.jpeg&quot;, @&quot;.png&quot;];</div><div class="line">    for (NSString *extension in extensions) &#123;</div><div class="line">        if ([self.absoluteString.lowercaseString rangeOfString:extension options:NSCaseInsensitiveSearch].location != NSNotFound)&#123;</div><div class="line">            return YES;</div><div class="line">        &#125;</div><div class="line">    &#125;</div><div class="line">    return NO;</div><div class="line">&#125;</div><div class="line">- (BOOL)URLStringcontainFomartString:(NSString *)string &#123;</div><div class="line">    return ([self.absoluteString.lowercaseString rangeOfString:string options:NSCaseInsensitiveSearch].location != NSNotFound);</div><div class="line">&#125;</div><div class="line">- (BOOL)isWebPURL &#123;</div><div class="line">    return [self URLStringcontainFomartString:@&quot;-webp&quot;] || [self URLStringcontainFomartString:@&quot;/webp&quot;];</div><div class="line">&#125;</div><div class="line">@end</div></pre></td></tr></table></figure>
+<p>所以，替换URL这个功能，被完全抽离出来，之后的代码，只需要考虑具体逻辑的问题了。</p>
+<p><strong>2. Native 图片请求替换</strong></p>
+<p>Native图片加载使用的SDWebImage，首先需要理解SD的代码，确定是最终的图片下载是调用的哪个方法</p>
+<figure class="highlight plain"><table><tr><td class="gutter"><pre><div class="line">1</div><div class="line">2</div><div class="line">3</div><div class="line">4</div></pre></td><td class="code"><pre><div class="line">- (id &lt;SDWebImageOperation&gt;)downloadImageWithURL:(NSURL *)url</div><div class="line">                                 options:(SDWebImageOptions)options</div><div class="line">                                progress:(SDWebImageDownloaderProgressBlock)progressBlock</div><div class="line">                               completed:(SDWebImageCompletionWithFinishedBlock)completedBlock</div></pre></td></tr></table></figure>
+<p>所有的图片下载，最终都走到了这个方法中，所以，替换URL应该在这个方法的最前面实现。</p>
+<figure class="highlight plain"><table><tr><td class="gutter"><pre><div class="line">1</div><div class="line">2</div><div class="line">3</div><div class="line">4</div><div class="line">5</div><div class="line">6</div><div class="line">7</div><div class="line">8</div><div class="line">9</div><div class="line">10</div><div class="line">11</div></pre></td><td class="code"><pre><div class="line">&#123;</div><div class="line">    if ([url isKindOfClass:NSString.class]) &#123;</div><div class="line">        url = [NSURL URLWithString:(NSString *)url];</div><div class="line">    &#125;</div><div class="line">    if (![url isKindOfClass:NSURL.class]) &#123;</div><div class="line">        url = nil;</div><div class="line">    &#125;</div><div class="line">    url = [url qd_replaceToWebPURLWithScreenWidth];</div><div class="line">    ...</div><div class="line">    ...</div><div class="line">&#125;</div></pre></td></tr></table></figure>
+<p>由于在评估了难度之后，我们果断地把SDWebImage从Pods中移除，手动添加一个子工程，这样可以比较方便地修改内部实现，而不至于用swizzling这种黑魔法来修改传入参数。这个技能虽然炫酷，然而很多情况下，杀敌一万，自损两万，不建议经常使用。</p>
+<p>因修改了url值，若在上层通过SDImageCache判断是否有本地缓存时，也需要对url先做qd_defultWebPURLCacheKey来获取其真实缓存的key。这一部分比较简单。</p>
+<p><strong>3. WebView 图片请求替换</strong></p>
+<p>这一部分是这个方案的难度所在。</p>
+<p>webkit内核现在都不支持解析WebP格式的图片，这里主要采用的iOS系统的NSURLProtocol来替换其网络请求（不了解NSURLProtocol，可以动动自己勤劳的小手Google一下），再将网络回包数据进行转码成jpg或者png（为了透明度），再返回给webview进行渲染的。</p>
+<p>友情链接，<a href="https://segmentfault.com/a/1190000006601382" target="_blank" rel="external">NSURLProtocol用法，大神文章</a></p>
+<p>同样的，iOS在此处依然不对gif进行任何处理。</p>
+<p>另外，NSURLProtocol会拦截全局的网络流量，为避免误伤，这里需要单独识别是否是WebView发起的请求，可以通过识别request中的UA是否包含”AppleWebKit”来实现。</p>
+<figure class="highlight plain"><table><tr><td class="gutter"><pre><div class="line">1</div><div class="line">2</div><div class="line">3</div><div class="line">4</div><div class="line">5</div><div class="line">6</div><div class="line">7</div><div class="line">8</div></pre></td><td class="code"><pre><div class="line">@implementation QDWebURLProtocol</div><div class="line">+ (BOOL)canInitWithRequest:(NSURLRequest *)request &#123;</div><div class="line">    </div><div class="line">    NSString *ua = [request valueForHTTPHeaderField:@&quot;User-Agent&quot;];</div><div class="line">    if ([request.URL qd_isShouldReplaceImageFormat] &amp;&amp; [ua lf_containsSubString:@&quot;AppleWebKit&quot;]) &#123;</div><div class="line">        return YES;</div><div class="line">    &#125;</div><div class="line">&#125;</div></pre></td></tr></table></figure>
+<p>这里可以接管所有WebView中需要替换的图片URL。</p>
+<p>下面，会自动调用startLoading方法，这里采用了一个非常特别的方式处理</p>
+<figure class="highlight plain"><table><tr><td class="gutter"><pre><div class="line">1</div><div class="line">2</div><div class="line">3</div><div class="line">4</div><div class="line">5</div><div class="line">6</div><div class="line">7</div><div class="line">8</div><div class="line">9</div><div class="line">10</div><div class="line">11</div><div class="line">12</div><div class="line">13</div><div class="line">14</div><div class="line">15</div><div class="line">16</div><div class="line">17</div><div class="line">18</div><div class="line">19</div><div class="line">20</div></pre></td><td class="code"><pre><div class="line">- (void)startLoading &#123;</div><div class="line">    if ([self.request.URL qd_isShouldReplaceImageFormat]) &#123;</div><div class="line">        [[SDWebImageManager sharedManager] downloadImageWithURL:self.request.URL</div><div class="line">                                                        options:0</div><div class="line">                                                       progress:nil</div><div class="line">                                                      completed:^(UIImage *image, NSError *error, SDImageCacheType cacheType, BOOL finished, NSURL *imageURL)</div><div class="line">                                                    &#123;</div><div class="line">                                                          NSData *data;</div><div class="line">                                                          if ([imageURL.absoluteString.lowercaseString lf_containsSubString:@&quot;.png&quot;]) &#123;</div><div class="line">                                                              data = UIImagePNGRepresentation(image);</div><div class="line">                                                          &#125; else &#123;</div><div class="line">                                                              data = UIImageJPEGRepresentation(image, 1);</div><div class="line">                                                          &#125;</div><div class="line">                                                          [self.client URLProtocol:self didLoadData:data];</div><div class="line">                                                          [self.client URLProtocolDidFinishLoading:self];</div><div class="line">                                                      &#125;];</div><div class="line">        return;</div><div class="line">    &#125;</div><div class="line">    self.connection = [NSURLConnection connectionWithRequest:self.request delegate:self];</div><div class="line">&#125;</div></pre></td></tr></table></figure>
+<p>是不是很奇特，由SDWebImageManager直接接管图片请求，手动finishLoading。</p>
+<p>首先需要明确，WebP节约流量，究竟是怎么样的原理：</p>
+<p>所谓图片格式，是采用何种解码编码方式决定的，所有数据最终一定是变成二进制数据，NSData；<br>既然UIWebView不支持解码WebP，我们可以让图片在网络中以WebP格式的NSData传递，本地收到data后，解码成UIWebView可以识别的UIImage；事实上，Native方面就是这么做就可以达到目标了，然而在WebView的请求中，无论我们本地做了何种处理，最终交给WebView的也一定是NSData，所以，需要再把UIImage编码成jpg或者png（之所以我们没有把gif也转WebP，就是因为从WebP的动图UIImage，转码成NSData这条路走不通，于是我们放弃了gif转WebP）。</p>
+<p>所以，大致的数据路径如下：</p>
+<blockquote>
+<p>本地发送WebP请求 —&gt; Server —&gt; 返回WebP格式Data —&gt; Data经谷歌的WebP decode得到UIImage —&gt; 将UIImage对象编码成JPG或PNG格式NSData —&gt; 替换本应交给WebView的WebP格式Data —&gt; WebView接收JPG或PNG格式Data —&gt; 渲染图片</p>
+</blockquote>
+<p>在最开始，这里并不是这么写的，当时是在系统的</p>
+<pre><code>- (void)connection:(NSURLConnection *)connection didReceiveData:(NSData *)data
+</code></pre><p>方法中转码处理。按这个思路写，代码越写越散，BUG也越来越多。所以，换了个思路，既然SD可以支持WebP，为什么不用他来全面托管呢？</p>
+<p>这样的话，原生请求和WebView的图片缓存也可以经由SD统一起来，所以，这应该是一个好的方案。</p>
+<p>这样的话，WebP的所有请求都已经可以处理（wifi预加载暂时不管，因为是自己写的downloader，替换URL后直接改把缓存指向修改就可以），之后要处理缓存的问题</p>
+<p><strong>4. 图片缓存处理</strong></p>
+<p>以前的代码已经实现了内部文章的缓存，包含js、css以及image等。这里通过NSURLCache来实现。相应的，基于WebP的图片缓存的读取也应该在NSURLCache中处理，在先处理完URL后，用新的Key来进行映射。</p>
+<p>这里建议所有基于WebView的流量优化都最好用UA的判断包住，避免带来问题。因为无论NSURLProtocol还是NSURLCache都是全局网络控制。</p>
+<p>篇幅略长，具体缓存处理放在下一篇介绍。</p>
+
+      
+    </div>
+    <footer class="article-footer">
+      <a data-url="https://curiosityst.github.io/2017/04/08/iOS 客户端基于 WebP 图片格式的流量优化（上）/" data-id="cj1adxbet0000jo1xofn90j61" class="article-share-link">Share</a>
+      
+      
+  <ul class="article-tag-list"><li class="article-tag-list-item"><a class="article-tag-list-link" href="/tags/应用技术/">应用技术</a></li></ul>
+
+    </footer>
+  </div>
+  
+    
+<nav id="article-nav">
+  
+  
+    <a href="/2017/04/09/iOS 客户端基于 WebP 图片格式的流量优化（下）/" id="article-nav-older" class="article-nav-link-wrap">
+      <strong class="article-nav-caption">Older</strong>
+      <div class="article-nav-title">iOS 客户端基于 WebP 图片格式的流量优化（下）</div>
+    </a>
+  
+</nav>
+
+  
+</article>
+
+</section>
+        
+          <aside id="sidebar">
+  
+    
+  <div class="widget-wrap">
+    <h3 class="widget-title">Categories</h3>
+    <div class="widget">
+      <ul class="category-list"><li class="category-list-item"><a class="category-list-link" href="/categories/工程实践/">工程实践</a></li></ul>
+    </div>
+  </div>
+
+
+  
+    
+  <div class="widget-wrap">
+    <h3 class="widget-title">Tags</h3>
+    <div class="widget">
+      <ul class="tag-list"><li class="tag-list-item"><a class="tag-list-link" href="/tags/应用技术/">应用技术</a></li></ul>
+    </div>
+  </div>
+
+
+  
+    
+  <div class="widget-wrap">
+    <h3 class="widget-title">Tag Cloud</h3>
+    <div class="widget tagcloud">
+      <a href="/tags/应用技术/" style="font-size: 10px;">应用技术</a>
+    </div>
+  </div>
+
+  
+    
+  <div class="widget-wrap">
+    <h3 class="widget-title">Archives</h3>
+    <div class="widget">
+      <ul class="archive-list"><li class="archive-list-item"><a class="archive-list-link" href="/archives/2017/04/">April 2017</a></li></ul>
+    </div>
+  </div>
+
+
+  
+    
+  <div class="widget-wrap">
+    <h3 class="widget-title">Recent Posts</h3>
+    <div class="widget">
+      <ul>
+        
+          <li>
+            <a href="/2017/04/09/iOS 客户端基于 WebP 图片格式的流量优化（下）/">iOS 客户端基于 WebP 图片格式的流量优化（下）</a>
+          </li>
+        
+          <li>
+            <a href="/2017/04/08/iOS 客户端基于 WebP 图片格式的流量优化（上）/">iOS 客户端基于 WebP 图片格式的流量优化（上）</a>
+          </li>
+        
+      </ul>
+    </div>
+  </div>
+
+  
+</aside>
+        
+      </div>
+      <footer id="footer">
+  
+  <div class="outer">
+    <div id="footer-info" class="inner">
+      &copy; 2017 孫小小小小濤<br>
+      Powered by <a href="http://hexo.io/" target="_blank">Hexo</a>
+    </div>
+  </div>
+</footer>
+    </div>
+    <nav id="mobile-nav">
+  
+    <a href="/" class="mobile-nav-link">Home</a>
+  
+    <a href="/archives" class="mobile-nav-link">Archives</a>
+  
+</nav>
+    
+
+<script src="//ajax.googleapis.com/ajax/libs/jquery/2.0.3/jquery.min.js"></script>
+
+
+  <link rel="stylesheet" href="/fancybox/jquery.fancybox.css">
+  <script src="/fancybox/jquery.fancybox.pack.js"></script>
+
+
+<script src="/js/script.js"></script>
+
+  </div>
+</body>
+</html>
