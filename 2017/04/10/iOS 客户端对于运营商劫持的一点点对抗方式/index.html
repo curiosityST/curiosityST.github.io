@@ -7,7 +7,7 @@
 <p>一般来说，针对各种网络劫持，大部分工作都是由前端来完成，针对这一方面的研究，也大多都是前端开发方向。但是其实客户端也可以通过一些方法来防劫持。</p>
 <p>作为客户端开发，我们应该先了解我们的URL Loading System。</p>
 <p><img src="http://oo6vl10at.bkt.clouddn.com/nsobject_hierarchy_2x.png" alt=""></p>
-<p>虽然 URL 加载系统包含的内容众多，但代码的设计上却非常良好，没有把复杂的操作暴露出来，开发者只需要在用到的时候进行设置。_（苹果官方文档<a href="https://developer.apple.com/library/content/documentation/Cocoa/Conceptual/URLLoadingSystem/URLLoadingSystem.html#//apple_ref/doc/uid/10000165i" target="_blank" rel="external">About the URL Loading System</a>，是每个 iOS 开发者都应该认真研究的。）_</p>
+<p>虽然 URL 加载系统包含的内容众多，但代码的设计上却非常良好，没有把复杂的操作暴露出来，开发者只需要在用到的时候进行设置。<em>（苹果官方文档<a href="https://developer.apple.com/library/content/documentation/Cocoa/Conceptual/URLLoadingSystem/URLLoadingSystem.html#//apple_ref/doc/uid/10000165i" target="_blank" rel="external">About the URL Loading System</a>，是每个 iOS 开发者都应该认真研究的。）</em></p>
 <h2 id="DNS劫持"><a href="#DNS劫持" class="headerlink" title="DNS劫持"></a>DNS劫持</h2><p><code>DNS劫持</code>的问题，就可以基于 <code>NSURLProtocol</code> 实现 <code>LocalDNS</code>防劫持方案。</p>
 <p>关于<code>LocalDNS</code>防劫持方案，可以参考一篇大神文章<a href="http://sindrilin.com/apm/2017/03/31/DNS%E5%8A%AB%E6%8C%81" target="_blank" rel="external">DNS防劫持</a>。</p>
 <p>简单来说，在网页发起请求的时候获取请求域名，然后在本地进行解析得到<code>ip</code>，返回一个直接访问网页<code>ip</code>地址的请求。</p>
@@ -34,7 +34,7 @@
 <p>An NSURLProtocol object handles the loading of protocol-specific URL data. The NSURLProtocol class itself is an abstract class that provides the infrastructure for processing URLs with a specific URL scheme. You create subclasses for any custom protocols or URL schemes that your app supports.</p>
 </blockquote>
 <p>在每一个 HTTP 请求开始时，URL 加载系统创建一个合适的 <code>NSURLProtocol</code> 对象处理对应的 URL 请求，而我们需要做的就是写一个继承自 <code>NSURLProtocol</code> 的类，并通过 <code>- registerClass:</code> 方法注册我们的协议类，然后 URL 加载系统就会在请求发出时使用我们创建的协议对象对该请求进行处理。</p>
-<p><strong>如何使用 NSURLProtocol 拦截 HTTP 请求？</strong>，有这个么几个问题需要去解决：</p>
+<p><strong>如何使用 NSURLProtocol 拦截 HTTP 请求？</strong>有这个么几个问题需要去解决：</p>
 <ul>
 <li>如何决定哪些请求需要当前协议对象处理？</li>
 <li>对当前的请求对象需要进行哪些处理？</li>
@@ -54,8 +54,8 @@
 <p>比如像媒体新闻类客户端的文章中，防止<code>js注入</code>。</p>
 <p>在具体的实现方式之前，需要有一些准备工作，就是关于<code>URL Loading System</code>中的<code>NSURLCache</code>。</p>
 <h3 id="NSURLCache"><a href="#NSURLCache" class="headerlink" title="NSURLCache"></a>NSURLCache</h3><p><code>NSURLCache</code> 为您的应用的 URL 请求提供了内存中以及磁盘上的综合缓存机制。 作为基础类库 <a href="https://developer.apple.com/library/mac/#documentation/Cocoa/Conceptual/URLLoadingSystem/URLLoadingSystem.html#//apple_ref/doc/uid/10000165i" target="_blank" rel="external">URL Loading System</a> 的一部分，任何通过 <code>NSURLConnection</code> 加载的请求都将被 <code>NSURLCache</code> 处理。</p>
-<p>当一个请求完成下载来自服务器的回应，一个缓存的回应将在本地保存。下一次同一个请求再发起时，本地保存的回应就会马上返回，不需要连接服务器。<code>NSURLCache</code> 会 <em>自动</em> 且 <em>透明</em> 地返回回应。</p>
-<p>在NSURLConnection加载系统中，缓存被设计为request对象的一个属性，由NSURLRequest对象的cachePolicy属性指定。而在NSURLSession加载系统中，缓存被设计为NSURLSessionConfiguration对像的一个属性，该属性所指定的策略被该session的所有request所共享。</p>
+<p>当一个请求完成得到来自服务器的<code>Response</code>，在本地保存作为cache。下一次同一个请求再发起时，本地保存的<code>Response</code>就会马上返回，不需要连接服务器。<code>NSURLCache</code> 会 <em>自动</em> 且 <em>透明</em> 地返回回应。</p>
+<p>在NSURLConnection加载系统中，缓存被设计为request对象的一个属性，由NSURLRequest对象的cachePolicy属性指定。而在NSURLSession加载系统中，缓存被设计为 NSURLSessionConfiguration对像的一个属性，该属性所指定的策略被该session的所有request所共享。</p>
 <p>作为一个<code>Cache</code>，它头文件中提供的方法并不复杂，就是基本的增删查改，（其中增和改可以算是一个功能，没有就增，改就是覆盖）。主要方法仅六个：</p>
 <figure class="highlight plain"><table><tr><td class="code"><pre><div class="line">// 初始化方法</div><div class="line">- (instancetype)initWithMemoryCapacity:(NSUInteger)memoryCapacity diskCapacity:(NSUInteger)diskCapacity diskPath:(nullable NSString *)path;</div><div class="line">// 查询方法</div><div class="line">- (nullable NSCachedURLResponse *)cachedResponseForRequest:(NSURLRequest *)request;</div><div class="line">// 存储方法</div><div class="line">- (void)storeCachedResponse:(NSCachedURLResponse *)cachedResponse forRequest:(NSURLRequest *)request;</div><div class="line">// 删除方法</div><div class="line">- (void)removeCachedResponseForRequest:(NSURLRequest *)request;</div><div class="line">- (void)removeAllCachedResponses;</div><div class="line">- (void)removeCachedResponsesSinceDate:(NSDate *)date NS_AVAILABLE(10_10, 8_0);</div></pre></td></tr></table></figure>
 <p>非常简洁的类，功能高度封装，用起来很简单。但是它也开辟了一个新世界，就是你可以实现一个子类，来接管系统的<code>URLCache</code>功能。只需要一个简单的步骤：</p>
